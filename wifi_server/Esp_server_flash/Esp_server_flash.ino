@@ -13,11 +13,15 @@ BitMap showProcess=BitMap();//display process and displaying object
 Ratelimit policeUser= Ratelimit();
 // 1. This function handles the final HTTP response after the stream ends
 void handleUploadResponse(){
-  server.send(200, "text/plain", "File uploaded and saved to flash successfully!");
+  server.send(200, "text/plain", "Upload successful!");
 }
 // 2. This function below help processes incoming binary data chunks sequentially
 void handleFileUpload() {
-  Serial.println("upload called");
+
+  HTTPUpload& upload = server.upload();
+  
+  if (upload.status == UPLOAD_FILE_START) {
+    Serial.println("upload called");
     IPAddress clientIP = server.client().remoteIP();
   
     // Convert it to a string for easy printing
@@ -26,9 +30,6 @@ void handleFileUpload() {
       Serial.printf("Client %s imprisoned..can't pass\n", clientIPStr);
       return;
     }
-  HTTPUpload& upload = server.upload();
-  
-  if (upload.status == UPLOAD_FILE_START) {
     // We will save all uploaded data into a file named "/uploaded_data.bin"
     String filename = "/"+upload.filename; 
     Serial.printf("Starting file upload: %s\n", filename.c_str());
@@ -37,13 +38,13 @@ void handleFileUpload() {
     uploadFile = LittleFS.open(filename, "w");
     if (!uploadFile) {
       Serial.println("Failed to open file for writing!");
-      server.send(400, "text/plain", "Failed to open file for writing!");
+      //server.send(400, "text/plain", "Failed to open file for writing!");
     }
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) {
     // Write the current data chunk to the flash memory
     if (uploadFile) {
-      size_t bytesWritten = uploadFile.write(upload.buf, upload.currentSize);
+      size_t bytesWritten = uploadFile.write(upload.buf, upload.currentSize);  
       if (bytesWritten != upload.currentSize) {
         Serial.println("Warning: Chunk write mismatch!");
       }
@@ -56,8 +57,8 @@ void handleFileUpload() {
       Serial.printf("Upload complete. Total size: %u bytes\n", upload.totalSize);
     }
   }
-}
-//3. the function below called to handle viewing of file saved on the saver with error handling for 
+} //3. the function below called to handle viewing of file saved on the saver with error handling for 
+
 void handleViewFile() {
 
   // 1. Check if the "name" argument was provided in the URL
@@ -158,7 +159,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   // the route to both the final response handler and the streaming chunk handler
-  server.on("/upload", HTTP_POST, handleFileUpload, handleUploadResponse);//route object creation for client uploading or posting 
+  server.on("/upload", HTTP_POST, handleUploadResponse, handleFileUpload);//route object creation for client uploading or posting 
   server.on("/view", HTTP_GET, handleViewFile);//route object creation for client downloading/streaming/getting
   server.on("/delete", HTTP_POST, handleReceiveText);//route for plain text delete command
 

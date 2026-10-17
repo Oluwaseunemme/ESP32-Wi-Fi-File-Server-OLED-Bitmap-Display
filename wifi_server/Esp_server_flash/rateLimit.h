@@ -38,8 +38,7 @@ class Ratelimit{
               Serial.println("Police caught a thieve...");
               Serial.printf("%s user is now locked\n", c[x]->ip);
           }
-          else if(c[x]->count>=_counterLimit){//helps reset limit for individuals with 10+ count without breaking limit
-            c[x]->count=0;
+          if(c[x]->count>=_counterLimit && c[x]->canPass){//helps reset limit for individuals with 10+ count without breaking limit
             c[x]->firstVisitTime=int(millis()/1000);
           }
           break;
@@ -57,7 +56,7 @@ class Ratelimit{
             Serial.printf("%s user is now freed from prison\n", c[x]->ip);
         }
        }
-       if(c[x]->count>10 && c[x]->canPass==true){
+       if(c[x]->count>_counterLimit && c[x]->canPass==true){
          c[x]->count=0;
        }
        //Serial.println("ALL motherfuckers freed....");
