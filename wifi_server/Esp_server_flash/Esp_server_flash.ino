@@ -2,20 +2,30 @@
 #include <WebServer.h>
 #include <LittleFS.h>
 #include "createBitmap.h"
+#include "rateLimit.h"
 
 const char* ssid = "Emmes pixel";
-const char* password = "Emman********";
+const char* password = "Emmanuel282003!";
 
 WebServer server(80);
 File uploadFile;
 BitMap showProcess=BitMap();//display process and displaying object
+Ratelimit policeUser= Ratelimit();
 // 1. This function handles the final HTTP response after the stream ends
-void handleUploadResponse() {
+void handleUploadResponse(){
   server.send(200, "text/plain", "File uploaded and saved to flash successfully!");
 }
-
 // 2. This function below help processes incoming binary data chunks sequentially
 void handleFileUpload() {
+  Serial.println("upload called");
+    IPAddress clientIP = server.client().remoteIP();
+  
+    // Convert it to a string for easy printing
+    String clientIPStr = clientIP.toString();
+    if(!policeUser.cannPass(clientIPStr)){
+      Serial.printf("Client %s imprisoned..can't pass\n", clientIPStr);
+      return;
+    }
   HTTPUpload& upload = server.upload();
   
   if (upload.status == UPLOAD_FILE_START) {
@@ -27,6 +37,7 @@ void handleFileUpload() {
     uploadFile = LittleFS.open(filename, "w");
     if (!uploadFile) {
       Serial.println("Failed to open file for writing!");
+      server.send(400, "text/plain", "Failed to open file for writing!");
     }
   } 
   else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -54,6 +65,14 @@ void handleViewFile() {
     server.send(400, "text/plain", "Bad Request: Missing 'name' parameter.");
     return;
   }
+    IPAddress clientIP = server.client().remoteIP();
+  
+    // Convert it to a string for easy printing
+    String clientIPStr = clientIP.toString();
+    if(!policeUser.cannPass(clientIPStr)){
+      Serial.printf("Client %s imprisoned..can't pass\n", clientIPStr);
+      return;
+    }
 
   // 2. Read the filename and prepend a '/' for LittleFS
   String filename = "/" + server.arg("name");
@@ -85,13 +104,20 @@ void handleReceiveText() {
       server.send(405, "text/plain", "Method Not Allowed");
       return;
     }
-
     // Check if the content type is text/plain
     // (Optional, but good practice for API validation)
     if (server.header("Content-Type") != "text/plain") {
       // Note: To read headers, you must call server.collectHeaders() in setup.
     }
-
+     
+    IPAddress clientIP = server.client().remoteIP();
+  
+    // Convert it to a string for easy printing
+    String clientIPStr = clientIP.toString();
+    if(!policeUser.cannPass(clientIPStr)){
+      Serial.printf("Client %s imprisoned..can't pass\n", clientIPStr);
+      return;
+    }
     // Read the raw text body from the request
     String receivedText = server.arg("plain");
 
@@ -112,6 +138,7 @@ void handleReceiveText() {
 void setup() {
   Serial.begin(115200);
   showProcess.init();
+  policeUser.init();
   // Initialize LittleFS
   if (!LittleFS.begin(true)) { // true enables auto-formating if it fails to mount
     Serial.println("LittleFS Mount Failed");
@@ -131,7 +158,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   // the route to both the final response handler and the streaming chunk handler
-  server.on("/upload", HTTP_POST, handleUploadResponse, handleFileUpload);//route object creation for client uploading or posting 
+  server.on("/upload", HTTP_POST, handleFileUpload, handleUploadResponse);//route object creation for client uploading or posting 
   server.on("/view", HTTP_GET, handleViewFile);//route object creation for client downloading/streaming/getting
   server.on("/delete", HTTP_POST, handleReceiveText);//route for plain text delete command
 
@@ -140,9 +167,10 @@ void setup() {
 
 bool tryShow=true;
 void loop() {
-  if (LittleFS.exists("/star_hex.txt") && showOnce) {
+  /*if (LittleFS.exists("/start_image.jpg") && showOnce) {
     bool result=showProcess.loadBitmapFromFS("/star_hex.txt");
     showOnce=!result;
-  }
+  }*/
   server.handleClient();
+  policeUser.freePrisoner();
 }
